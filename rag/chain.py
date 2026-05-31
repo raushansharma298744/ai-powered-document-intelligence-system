@@ -80,9 +80,18 @@ def build_rag_chain(vectorstore: FAISS):
             (
                 "system",
                 "You are a RAG assistant. Answer ONLY using the retrieved context below. "
-                "If the answer is not in the context, say: "
-                "'I could not find that in the uploaded documents.' "
-                "Be clear and concise.\n\n"
+                "If the answer is not in the context, say: 'I could not find that in the uploaded documents.' "
+                "Produce the response in STRICT JSON only — nothing else. The JSON must follow this schema:\n"
+                "{{\n"
+                "  \"answer\": string,            # short direct answer to the user's question\n"
+                "  \"summary\": string|null,     # one-paragraph summary of relevant context (optional)\n"
+                "  \"bullets\": [string],        # key points from the document (can be empty)\n"
+                "  \"follow_up_questions\": [string], # useful follow-up questions (optional)\n"
+                "  \"sources\": [                # optional list of used source segments\n"
+                "    {{\"index\": int, \"source\": string, \"preview\": string}}\n"
+                "  ]\n"
+                "}}\n"
+                "Be concise and factual. Never hallucinate facts outside the provided context.\n\n"
                 "Context:\n{context}",
             ),
             MessagesPlaceholder("chat_history"),

@@ -8,6 +8,7 @@ from datetime import datetime
 
 import streamlit as st
 from dotenv import load_dotenv
+import json
 
 from rag import (
     build_rag_chain,
@@ -36,6 +37,15 @@ from ui import (
 )
 
 load_dotenv()
+
+# Check for presence of an API key early so we can show a helpful UI message
+from rag.config import get_google_api_key
+
+try:
+    _ = get_google_api_key()
+    HAS_API_KEY = True
+except Exception:
+    HAS_API_KEY = False
 
 # Quick Start cards: (icon, title, description, query_text)
 QUICK_START = [
@@ -132,12 +142,34 @@ def add_chat(role: str, content: str, sources=None):
 def answer_question(question: str):
     history = st.session_state.chat_history
     result = run_rag(st.session_state.rag_chain, question, history)
-    answer = result.get("answer", "Sorry, I could not find an answer in your document.")
-    sources = chunks_from_result(result.get("context", []))
-    add_chat("assistant", answer, sources=sources)
+    raw = result.get("answer", "Sorry, I could not find an answer in your document.")
+    # Try to parse structured JSON output from the LLM (if present)
+    content = None
+    sources = None
+    try:
+        parsed = json.loads(raw)
+        parts = []
+        if parsed.get("summary"):
+            parts.append(f"Summary:\n{parsed['summary']}")
+        if parsed.get("bullets"):
+            bullets = "\n".join(f"- {b}" for b in parsed.get("bullets", []))
+            parts.append(f"Key points:\n{bullets}")
+        if parsed.get("answer"):
+            parts.append(f"Answer:\n{parsed['answer']}")
+        if parsed.get("follow_up_questions"):
+            fu = "\n".join(f"- {q}" for q in parsed.get("follow_up_questions", []))
+            parts.append(f"Suggested follow-up questions:\n{fu}")
+        content = "\n\n".join(parts) if parts else parsed.get("answer", raw)
+        sources = parsed.get("sources") or chunks_from_result(result.get("context", []))
+    except Exception:
+        # Not JSON — fall back to the raw answer string
+        content = raw
+        sources = chunks_from_result(result.get("context", []))
+
+    add_chat("assistant", content, sources=sources)
     st.session_state.chat_history = history + [
         {"role": "user", "content": question},
-        {"role": "assistant", "content": answer},
+        {"role": "assistant", "content": content},
     ]
     st.session_state.suggest_hint = question
 
@@ -183,14 +215,26 @@ elif page == 1:
         if not uploaded:
             st.warning("Please upload a PDF first.")
         else:
-            with st.spinner("Loading document..."):
-                try:
-                    process_document(uploaded)
-                    set_greeting()
-                    st.session_state.page = 2
-                    st.rerun()
-                except Exception as e:
-                    st.error(format_user_error(e))
+            if not HAS_API_KEY:
+                st.error(
+                    "Invalid or missing API key. Check GROK_API_KEY or GOOGLE_API_KEY in your .env file."
+                )
+            else:
+                with st.spinner("Loading document..."):
+                    try:
+                        process_document(uploaded)
+                        set_greeting()
+                        st.session_state.page = 2
+                        st.rerun()
+                    except Exception as e:
+                        # Show both a user-friendly hint and the raw exception for debugging
+                        st.error(
+                            "Document processing failed. See details below. Common causes: invalid API key, missing sentence-transformers, or network issues."
+                        )
+                        st.exception(e)
+                        st.info(
+                            "Try: `pip install -r requirements.txt`, verify `.env` keys, then restart the app."
+                        )
     st.markdown("</div>", unsafe_allow_html=True)
     if st.button("← Back"):
         st.session_state.page = 0
