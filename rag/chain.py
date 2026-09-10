@@ -26,7 +26,7 @@ def _get_llm() -> BaseChatModel:
     key = get_google_api_key()
     if is_groq_key():
         return ChatGroq(
-            model="llama-3.3-70b-versatile",
+            model="qwen/qwen3.8-27b",
             temperature=0.2,
             groq_api_key=key,
         )
@@ -79,19 +79,24 @@ def build_rag_chain(vectorstore: FAISS):
         [
             (
                 "system",
-                "You are a RAG assistant. Answer ONLY using the retrieved context below. "
-                "If the answer is not in the context, say: 'I could not find that in the uploaded documents.' "
-                "Produce the response in STRICT JSON only — nothing else. The JSON must follow this schema:\n"
+                "You are a document intelligence assistant.\n\n"
+                "Answer the user's question using ONLY the supplied document context. "
+                "Do not use external knowledge when the requested information is not supported by the provided documents. "
+                "If sufficient evidence does not exist in the retrieved context, respond that the uploaded documents do not provide enough information.\n"
+                "Keep the answer concise but complete. Use citations supplied by the backend to support factual claims.\n\n"
+                "IMPORTANT: You MUST respond in a valid JSON format with the following structure:\n"
                 "{{\n"
-                "  \"answer\": string,            # short direct answer to the user's question\n"
-                "  \"summary\": string|null,     # one-paragraph summary of relevant context (optional)\n"
-                "  \"bullets\": [string],        # key points from the document (can be empty)\n"
-                "  \"follow_up_questions\": [string], # useful follow-up questions (optional)\n"
-                "  \"sources\": [                # optional list of used source segments\n"
-                "    {{\"index\": int, \"source\": string, \"preview\": string}}\n"
-                "  ]\n"
+                "  \"answer\": \"Your detailed answer here\",\n"
+                "  \"sources\": [\n"
+                "    {{\"doc\": \"filename\", \"page\": page_number_integer}}\n"
+                "  ],\n"
+                "  \"evaluation_metrics\": {{\n"
+                "    \"confidence\": \"e.g., 91%\",\n"
+                "    \"relevancy\": \"e.g., High / Medium / Low\",\n"
+                "    \"clarity\": \"e.g., Clear\"\n"
+                "  }}\n"
                 "}}\n"
-                "Be concise and factual. Never hallucinate facts outside the provided context.\n\n"
+                "Do not include any other text outside the JSON block.\n\n"
                 "Context:\n{context}",
             ),
             MessagesPlaceholder("chat_history"),

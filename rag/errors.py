@@ -6,8 +6,9 @@ def format_user_error(exc: BaseException) -> str:
     lower = msg.lower()
     if "quota" in lower or "resource_exhausted" in lower or "429" in msg:
         return (
-            "Google API daily limit reached (embeddings or chat). "
-            "Wait a few minutes, try again tomorrow, or use a different API key in `.env`."
+            "API daily limit reached (Groq or Google). "
+            "Wait a few minutes, try again tomorrow, or use a different API key in `.env`. "
+            "(Groq free tier has very strict token/minute limits)."
         )
     if "unexpected model name format" in lower:
         return (

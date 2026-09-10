@@ -9,7 +9,7 @@ LangChain:
 from pathlib import Path
 from typing import List
 
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -29,7 +29,7 @@ def load_pdfs(uploaded_files) -> List[Document]:
 
     for uploaded in uploaded_files:
         pdf_path = save_uploaded_pdf(uploaded)
-        pages = PyPDFLoader(str(pdf_path)).load()
+        pages = PyMuPDFLoader(str(pdf_path)).load()
         for page in pages:
             page.metadata["source"] = uploaded.name
         documents.extend(pages)
@@ -46,8 +46,17 @@ def split_into_chunks(documents: List[Document]) -> List[Document]:
     Why chunk? LLMs have limited context; retrieval needs small, focused passages.
     """
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
+        chunk_size=800,
+        chunk_overlap=150,
         add_start_index=True,
     )
-    return splitter.split_documents(documents)
+    chunks = splitter.split_documents(documents)
+    if not chunks:
+        raise ValueError("No text could be extracted from the PDF. It might be a scanned document without OCR.")
+        
+    for i, chunk in enumerate(chunks):
+        doc_name = chunk.metadata.get("source", "unknown")
+        # Ensure it's a simple filename
+        doc_name = Path(doc_name).name
+        chunk.metadata["chunk_id"] = f"{doc_name}_chunk_{i}"
+    return chunks

@@ -13,9 +13,9 @@ EMBEDDING_MODEL = "models/gemini-embedding-001"
 LLM_MODEL = "gemini-3-flash-preview"
 
 # --- RAG tuning ---
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 200
-TOP_K = 4  # number of chunks retrieved per query
+CHUNK_SIZE = 800
+CHUNK_OVERLAP = 150
+TOP_K = 3  # number of chunks retrieved per query
 
 # --- Local storage ---
 DATA_DIR = Path("data")
@@ -37,4 +37,22 @@ def is_groq_key() -> bool:
         return get_google_api_key().startswith("gsk_")
     except Exception:
         return False
+
+def _get_llm():
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_groq import ChatGroq
+    from langchain_core.language_models.chat_models import BaseChatModel
+    
+    key = get_google_api_key()
+    if is_groq_key():
+        return ChatGroq(
+            model="qwen/qwen3.8-27b",
+            temperature=0.2,
+            groq_api_key=key,
+        )
+    return ChatGoogleGenerativeAI(
+        model=LLM_MODEL,
+        temperature=0.2,
+        google_api_key=key,
+    )
 

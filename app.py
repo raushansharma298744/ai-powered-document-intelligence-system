@@ -12,7 +12,7 @@ import json
 
 from rag import (
     build_rag_chain,
-    create_vectorstore,
+    create_indexes,
     load_pdfs,
     run_rag,
     split_into_chunks,
@@ -94,7 +94,9 @@ def reset_all():
 def process_document(uploaded_file):
     docs = load_pdfs([uploaded_file])
     chunks = split_into_chunks(docs)
-    st.session_state.vectorstore = create_vectorstore(chunks)
+    vectorstore, bm25store = create_indexes(chunks)
+    st.session_state.vectorstore = vectorstore
+    st.session_state.bm25store = bm25store
     st.session_state.rag_chain = build_rag_chain(st.session_state.vectorstore)
     st.session_state.doc_name = uploaded_file.name
     st.session_state.chunk_count = len(chunks)
